@@ -85,7 +85,7 @@ export class NotesSyncer {
 
 		// TODO add validity checks for slug and section values
 		const { section, converter } = buildConverter(
-			fm, data, cache.frontmatterPosition!.end.offset, file.basename, this.settings
+			fm, data, cache.frontmatterPosition!.end, file.basename, this.settings, cache.sections ?? []
 		);
 		const slug = fm[this.settings.fmSlug];
 		const bundlePath = path.join(this.resolveDiskDestination(), section, slug);

@@ -1,5 +1,5 @@
 import { promises as fs } from "fs";
-import { FrontMatterCache } from "obsidian";
+import { FrontMatterCache, Loc, SectionCache } from "obsidian";
 import path from "path";
 
 import { NotesPublisherSettings } from "./settings.js";
@@ -10,23 +10,39 @@ export interface FrontMatterConfig {
 	title: string,
 }
 
+// section types with visual line breaks in Obsidian
+const HARD_BREAK_SECTION_TYPES = new Set(['blockquote', 'callout', 'list', 'paragraph']);
+
+// subset of SectionCache, position are relative to the body (without frontmatter)
+export type BodySection = { type: string, position: { start: { line: number }, end: { line: number } } };
+
 export function buildConverter(
 	fm: FrontMatterCache,
 	data: string,
-	bodyOffset: number,
+	frontmatterEnd: Loc,
 	fallbackTitle: string,
 	settings: NotesPublisherSettings,
+	sections: SectionCache[] = [],
 ): { title: string, section: string, converter: NoteConverter } {
 	const title: string = fm[settings.fmTitle] ?? fallbackTitle;
-	const body = data.slice(bodyOffset).replace(/^\n/, '');
+	const body = data.slice(frontmatterEnd.offset).replace(/^\n/, '');
 	const section = fm[settings.fmSection] ?? settings.defaultSection;
+
+	const bodyStartLine = frontmatterEnd.line + 1;
+	const bodySections: BodySection[] = sections.map((s) => ({
+		type: s.type,
+		position: {
+			start: { line: s.position.start.line - bodyStartLine },
+			end: { line: s.position.end.line - bodyStartLine },
+		},
+	}));
 
 	const converter = new NoteConverter(title, {
 		date: settings.fmDate,
 		draft: settings.fmDraft,
 		title: settings.fmTitle,
 	});
-	converter.convert(fm, body);
+	converter.convert(fm, body, bodySections);
 
 	return { title, section, converter };
 }
@@ -43,9 +59,9 @@ export class NoteConverter {
 		this.fmConfig = fmConfig;
 	}
 
-	convert(fm: FrontMatterCache, content: string) {
+	convert(fm: FrontMatterCache, content: string, sections: BodySection[] = []) {
 		this.processFrontMatter(fm);
-		this.processContent(content);
+		this.processContent(content, sections);
 	}
 
 	private processFrontMatter(fm: FrontMatterCache) {
@@ -64,7 +80,7 @@ export class NoteConverter {
 		}
 	}
 
-	private processContent(content: string) {
+	private processContent(content: string, sections: BodySection[]) {
 		const processed = content
 			// embedded image
 			.replace(
@@ -72,18 +88,21 @@ export class NoteConverter {
 				'![$2]($1)'
 			);
 
-		// in paragraph line break
+		const sectionOfLine = (line: number) =>
+			sections.find((s) => s.position.start.line <= line && line <= s.position.end.line);
+
+		// translate visual line breaks to hard breaks for CommonMark
 		const lines = processed.split('\n');
-		let inFence = false;
 		this.convertedContent = lines
 			.map((line, i) => {
-				if (/^```/.test(line)) {
-					inFence = !inFence;
-					return line;
-				}
 				const next = lines[i + 1];
-				if (inFence || line === '' || next === undefined || next === '')
+				if (line === '' || next === undefined || next === '')
 					return line;
+
+				const section = sectionOfLine(i);
+				if (!section || !HARD_BREAK_SECTION_TYPES.has(section.type) || section !== sectionOfLine(i + 1))
+					return line;
+
 				return line + '  ';
 			})
 			.join('\n');

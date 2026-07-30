@@ -28,7 +28,7 @@ export async function collectFiles(app: App, settings: NotesPublisherSettings): 
 		const data = await app.vault.cachedRead(it);
 
 		const { title, section, converter } = buildConverter(
-			fm, data, cache.frontmatterPosition!.end.offset, it.basename, settings
+			fm, data, cache.frontmatterPosition!.end, it.basename, settings, cache.sections ?? []
 		);
 		const slug = fm[settings.fmSlug] ?? slugify(title);
 		const bundlePath = path.join(section, slug, 'index.md');
