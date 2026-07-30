@@ -1,0 +1,10 @@
+{
+	"id": "notes-publisher",
+	"name": "Notes Publisher",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Synchronize some of your notes with your static web site.",
+	"author": "casimir",
+	"authorUrl": "https://notes.casimir.me/about/",
+	"isDesktopOnly": false
+}

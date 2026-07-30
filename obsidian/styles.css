@@ -1,0 +1,40 @@
+.np-idle-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-4) 0;
+}
+
+.np-diff {
+	overflow: auto;
+	max-height: 60vh;
+	white-space: pre;
+	font-family: var(--font-monospace);
+}
+
+.np-diff-header {
+	color: var(--text-muted);
+}
+
+.np-diff-add {
+	color: var(--text-success);
+}
+
+.np-diff-del {
+	color: var(--text-error);
+}
+
+.np-diff-context {
+	color: var(--text-normal);
+}
+
+@keyframes spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.np-spin {
+	display: inline-flex;
+	animation: spin 1s linear infinite;
+}
