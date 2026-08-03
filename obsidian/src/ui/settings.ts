@@ -111,7 +111,7 @@ export class NotesPublisherSettingsTab extends PluginSettingTab {
 			)
 			.addSetting((setting) => setting
 				.setName('Draft state attribute')
-				.setDesc('Boolean flag to determine if the note is ready to be publised.')
+				.setDesc('Boolean flag to determine if the note is ready to be published.')
 				.addText((text) => text
 					.setPlaceholder(DEFAULT_SETTINGS.fmDraft)
 					.setValue(this.plugin.settings.fmDraft)
@@ -153,6 +153,18 @@ export class NotesPublisherSettingsTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.fmSection)
 					.onChange(async (value) => {
 						this.plugin.settings.fmSection = value;
+						await this.plugin.saveSettings();
+					})
+				)
+			)
+			.addSetting((setting) => setting
+				.setName('Topics attribute')
+				.setDesc('Tags for the published article. Note links are converted to plain text.')
+				.addText((text) => text
+					.setPlaceholder(DEFAULT_SETTINGS.fmTags)
+					.setValue(this.plugin.settings.fmTags)
+					.onChange(async (value) => {
+						this.plugin.settings.fmTags = value;
 						await this.plugin.saveSettings();
 					})
 				)

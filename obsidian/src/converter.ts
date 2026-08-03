@@ -8,6 +8,7 @@ export interface FrontMatterConfig {
 	date: string,
 	draft: string,
 	title: string,
+	tags: string,
 }
 
 // section types with visual line breaks in Obsidian
@@ -35,6 +36,12 @@ function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string,
 	}
 
 	return { data: result, attachments };
+}
+
+const WIKILINK = /^\[\[([^\]|#]+)[^\]]*\]\]$/;
+
+function stripWikilink(value: string): string {
+	return (value.match(WIKILINK)?.[1] ?? value).trim();
 }
 
 export interface ResolvedAttachment {
@@ -78,6 +85,7 @@ export function buildConverter(
 		date: settings.fmDate,
 		draft: settings.fmDraft,
 		title: settings.fmTitle,
+		tags: settings.fmTags,
 	});
 	converter.convert(fm, body, bodySections, attachments);
 
@@ -117,6 +125,14 @@ export class NoteConverter {
 		if (this.fmConfig.draft in fm) {
 			const value: boolean = fm[this.fmConfig.draft];
 			this.convertedFm.push(['draft', value.toString()]);
+		}
+
+		if (this.fmConfig.tags in fm) {
+			const raw = fm[this.fmConfig.tags];
+			const values: string[] = Array.isArray(raw) ? raw : [raw];
+			const names = values.map(stripWikilink).filter((n) => n !== '');
+			if (names.length > 0)
+				this.convertedFm.push(['tags', `[${names.map((n) => JSON.stringify(n)).join(', ')}]`]);
 		}
 	}
 

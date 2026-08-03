@@ -9,6 +9,7 @@ const fmConfig: FrontMatterConfig = {
 	date: "created",
 	draft: "draft",
 	title: "np-title",
+	tags: "topics",
 };
 
 interface Case {
@@ -89,6 +90,94 @@ const cases: Case[] = [
 		},
 		expect: {
 			content: "---\ntitle: Lorem ipsum\ndate: 2024-01-15\ndraft: true\n---\n\nLorem ipsum dolor sit amet",
+		},
+	},
+	{
+		name: "maps a wikilink topic to a tag",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["[[Frigoligo]]"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"Frigoligo\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "collapses an aliased wikilink topic to its link target",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["[[Frigoligo|the app]]"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"Frigoligo\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "collapses a wikilink topic with a heading anchor to its link target",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["[[Frigoligo#Setup]]"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"Frigoligo\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "passes a plain string topic through unchanged",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["frigoligo"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"frigoligo\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "coerces a lone non-array topics value to a single tag",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: "[[Frigoligo]]" },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"Frigoligo\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "emits no tags line when the topics field is absent",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "maps several topics, one with accented characters, to distinct tags",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["[[Frigoligo]]", "[[Café]]", "[[Yak shaving]]"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"Frigoligo\", \"Café\", \"Yak shaving\"]\n---\n\nLorem ipsum",
+		},
+	},
+	{
+		name: "quotes a topic name containing a comma",
+		title: "Some title",
+		input: {
+			frontmatter: { topics: ["[[C, C++]]"] },
+			content: "Lorem ipsum",
+		},
+		expect: {
+			content: "---\ntitle: Some title\ntags: [\"C, C++\"]\n---\n\nLorem ipsum",
 		},
 	},
 ];

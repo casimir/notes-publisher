@@ -20,7 +20,7 @@ export interface NotesPublisherSettings {
 	fmTitle: string,
 	fmSlug: string,
 	fmSection: string,
-	// TODO tags
+	fmTags: string,
 }
 
 export const DEFAULT_SETTINGS: NotesPublisherSettings = {
@@ -37,4 +37,5 @@ export const DEFAULT_SETTINGS: NotesPublisherSettings = {
 	fmTitle: 'np-title',
 	fmSlug: 'np-slug',
 	fmSection: 'np-section',
+	fmTags: 'topics',
 };
