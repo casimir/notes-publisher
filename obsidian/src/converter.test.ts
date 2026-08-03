@@ -1,7 +1,9 @@
 import { promises as fs } from "fs";
+import { CachedMetadata, EmbedCache, Loc } from "obsidian";
 import { join } from "path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BodySection, FrontMatterConfig, NoteConverter } from "./converter.js";
+import { BodySection, buildConverter, FrontMatterConfig, NoteConverter } from "./converter.js";
+import { DEFAULT_SETTINGS as settings } from "./settings.js";
 
 const fmConfig: FrontMatterConfig = {
 	date: "created",
@@ -21,32 +23,6 @@ function section(type: string, startLine: number, endLine = startLine) {
 }
 
 const cases: Case[] = [
-	{
-		name: "converts image embeds to CommonMark, leaves prose and bare wikilinks untouched",
-		title: "Some title",
-		input: {
-			frontmatter: {},
-			content:
-				"Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n\n" +
-				"![[dolor.png|Sed do eiusmod tempor]]\n\n" +
-				"See also [[Ut enim ad minim]] for the flip side.\n\n" +
-				"![[sit.svg|Quis nostrud exercitation]]",
-			sections: [
-				section("paragraph", 0),
-				section("paragraph", 2),
-				section("paragraph", 4),
-				section("paragraph", 6),
-			],
-		},
-		expect: {
-			content:
-				"---\ntitle: Some title\n---\n\n" +
-				"Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n\n" +
-				"![Sed do eiusmod tempor](dolor.png)\n\n" +
-				"See also [[Ut enim ad minim]] for the flip side.\n\n" +
-				"![Quis nostrud exercitation](sit.svg)",
-		},
-	},
 	{
 		name: "appends hard-break spaces to intra-paragraph newlines, not to blank-line breaks or fenced code",
 		title: "Some title",
@@ -71,11 +47,11 @@ const cases: Case[] = [
 		},
 	},
 	{
-		name: "does not add a hard break between an embedded image and a quoted caption line",
+		name: "does not add a hard break between an image and a quoted caption line",
 		title: "Some title",
 		input: {
 			frontmatter: {},
-			content: "![[dolor.png|alt text]]\n> A caption right below the image.",
+			content: "![alt text](dolor.png)\n> A caption right below the image.",
 			sections: [
 				section("paragraph", 0),
 				section("blockquote", 1),
@@ -141,5 +117,84 @@ describe("NoteConverter", () => {
 
 		expect(writeFile).toHaveBeenCalledOnce();
 		expect(writeFile).toHaveBeenCalledWith(join("/out", "index.md"), converter.toCommonMark(), "utf-8");
+	});
+});
+
+const FRONTMATTER = "---\n---\n";
+const FRONTMATTER_END: Loc = { line: 1, col: 3, offset: FRONTMATTER.length };
+
+// finds each raw embed in `data` in order, so duplicate raw text resolves to distinct offsets
+function embedsIn(data: string, specs: { raw: string; link: string; displayText?: string }[]): EmbedCache[] {
+	let cursor = 0;
+	return specs.map(({ raw, link, displayText }) => {
+		const offset = data.indexOf(raw, cursor);
+		cursor = offset + raw.length;
+		return {
+			link,
+			displayText,
+			original: raw,
+			position: {
+				start: { line: 0, col: 0, offset },
+				end: { line: 0, col: 0, offset: offset + raw.length },
+			},
+		};
+	});
+}
+
+const cacheWith = (embeds: EmbedCache[]) =>
+	({ frontmatter: {}, frontmatterPosition: { start: FRONTMATTER_END, end: FRONTMATTER_END }, embeds }) as CachedMetadata;
+
+describe("buildConverter attachments", () => {
+	it("rewrites embeds to CommonMark images, leaves note embeds untouched", () => {
+		const body =
+			"Lorem ipsum.\n\n![[dolor.png|Sed do eiusmod]]\n\nSee also [[Ut enim ad minim]] for the flip side.";
+		const data = FRONTMATTER + body;
+		const embeds = embedsIn(data, [
+			{ raw: "![[dolor.png|Sed do eiusmod]]", link: "dolor.png", displayText: "Sed do eiusmod" },
+		]);
+
+		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
+
+		expect(converter.toCommonMark()).toBe(
+			"---\ntitle: fallback\n---\n\n" +
+			"Lorem ipsum.\n\n![Sed do eiusmod](dolor.png)\n\nSee also [[Ut enim ad minim]] for the flip side."
+		);
+		expect(converter.attachments).toEqual(["dolor.png"]);
+	});
+
+	it("keeps an empty alt for a no-alt embed", () => {
+		const body = "![[dolor.png]]";
+		const data = FRONTMATTER + body;
+		const embeds = embedsIn(data, [{ raw: "![[dolor.png]]", link: "dolor.png" }]);
+
+		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
+
+		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![](dolor.png)");
+	});
+
+	it("keeps a nested-path embed's link as the bundle-relative path", () => {
+		const body = "![[attachments/nested/img.jpg|Nested]]";
+		const data = FRONTMATTER + body;
+		const embeds = embedsIn(data, [
+			{ raw: "![[attachments/nested/img.jpg|Nested]]", link: "attachments/nested/img.jpg", displayText: "Nested" },
+		]);
+
+		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
+
+		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![Nested](attachments/nested/img.jpg)");
+		expect(converter.attachments).toEqual(["attachments/nested/img.jpg"]);
+	});
+
+	it("dedupes an attachment embedded more than once", () => {
+		const body = "![[dolor.png|first]]\n\n![[dolor.png|second]]";
+		const data = FRONTMATTER + body;
+		const embeds = embedsIn(data, [
+			{ raw: "![[dolor.png|first]]", link: "dolor.png", displayText: "first" },
+			{ raw: "![[dolor.png|second]]", link: "dolor.png", displayText: "second" },
+		]);
+
+		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
+
+		expect(converter.attachments).toEqual(["dolor.png"]);
 	});
 });

@@ -5,13 +5,10 @@ import {
 	Plugin
 } from 'obsidian';
 
-import {
-	DEFAULT_SETTINGS,
-	NotesPublisherSettings,
-	NotesPublisherSettingsTab
-} from './settings.js';
+import { DEFAULT_SETTINGS, NotesPublisherSettings } from './settings.js';
 import { NotesSyncer } from './syncer.js';
 import { PublishModal } from './ui/publish-modal.js';
+import { NotesPublisherSettingsTab } from './ui/settings.js';
 
 
 const CMD_LABEL_PUBLISH = 'Publish notes to the server'
@@ -28,10 +25,10 @@ export default class NotesPublisher extends Plugin {
 		await this.loadSettings();
 		this.addSettingTab(new NotesPublisherSettingsTab(this.app, this));
 
-		this.syncer = new NotesSyncer(this.settings, this.app.fileManager.processFrontMatter);
-		this.registerEvent(this.app.vault.on("create", EN(this.syncer.onFileCreate)));
+		this.syncer = new NotesSyncer(this.app, this.settings);
 		this.registerEvent(this.app.vault.on("delete", EN(this.syncer.onFileDelete)));
 		this.registerEvent(this.app.vault.on("modify", EN(this.syncer.onFileUpdate)));
+		this.registerEvent(this.app.vault.on("rename", EN(this.syncer.onFileRename)));
 		this.registerEvent(this.app.metadataCache.on("changed", EN(this.syncer.onNoteUpdate)));
 
 

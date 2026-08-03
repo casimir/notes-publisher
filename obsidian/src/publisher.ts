@@ -3,11 +3,9 @@ import path from "path"
 
 import slugify from "@sindresorhus/slugify"
 
-import { buildConverter } from "./converter.js"
+import { buildConverter, resolveAttachments } from "./converter.js"
 import { filterAllNotes } from "./filter.js"
 import { NotesPublisherSettings } from "./settings.js"
-
-export enum FileType { blob, text }
 
 export interface RawFile {
 	name: string
@@ -21,23 +19,27 @@ export interface PublishResponse {
 
 export async function collectFiles(app: App, settings: NotesPublisherSettings): Promise<RawFile[]> {
 	const notes = filterAllNotes(app, settings.notesFilter);
-	// TODO collect attachments too
-	return await Promise.all(notes.map(async (it) => {
+	const files = await Promise.all(notes.map(async (it) => {
 		const cache = app.metadataCache.getFileCache(it)!;
-		const fm = cache.frontmatter!; // safe: filterAllNotes only matches notes with frontmatter
+		const fm = cache.frontmatter!;
 		const data = await app.vault.cachedRead(it);
 
-		const { title, section, converter } = buildConverter(
-			fm, data, cache.frontmatterPosition!.end, it.basename, settings, cache.sections ?? []
-		);
+		const { title, section, converter } = buildConverter(cache, data, it.basename, settings);
 		const slug = fm[settings.fmSlug] ?? slugify(title);
-		const bundlePath = path.join(section, slug, 'index.md');
+		const bundleDir = path.join(section, slug);
 
-		return {
-			name: bundlePath,
-			content: new Blob([converter.toCommonMark()]),
-		};
+		const attachmentFiles = await Promise.all(resolveAttachments(app, converter.attachments, it.path).map(async ({ link, file }) => ({
+			name: path.join(bundleDir, link),
+			content: new Blob([await app.vault.readBinary(file)]),
+		})));
+
+		return [
+			{ name: path.join(bundleDir, 'index.md'), content: new Blob([converter.toCommonMark()]) },
+			...attachmentFiles,
+		];
 	}));
+
+	return files.flat();
 }
 
 export class Publisher {

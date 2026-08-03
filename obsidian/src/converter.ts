@@ -1,5 +1,5 @@
 import { promises as fs } from "fs";
-import { FrontMatterCache, Loc, SectionCache } from "obsidian";
+import { App, CachedMetadata, EmbedCache, FrontMatterCache, TFile } from "obsidian";
 import path from "path";
 
 import { NotesPublisherSettings } from "./settings.js";
@@ -16,20 +16,57 @@ const HARD_BREAK_SECTION_TYPES = new Set(['blockquote', 'callout', 'list', 'para
 // subset of SectionCache, position are relative to the body (without frontmatter)
 export type BodySection = { type: string, position: { start: { line: number }, end: { line: number } } };
 
+const IMAGE_EXTENSIONS = new Set(['.gif', '.jpeg', '.jpg', '.png', '.svg']);
+
+function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string, attachments: string[] } {
+	const attachments: string[] = [];
+	const byOffsetDesc = [...embeds].sort((a, b) => b.position.start.offset - a.position.start.offset);
+
+	let result = data;
+	for (const embed of byOffsetDesc) {
+		const ext = path.extname(embed.link).toLowerCase();
+		if (!IMAGE_EXTENSIONS.has(ext)) continue;
+
+		if (!attachments.includes(embed.link)) attachments.unshift(embed.link);
+
+		const alt = embed.displayText && embed.displayText !== embed.link ? embed.displayText : '';
+		const replacement = `![${alt}](${embed.link})`;
+		result = result.slice(0, embed.position.start.offset) + replacement + result.slice(embed.position.end.offset);
+	}
+
+	return { data: result, attachments };
+}
+
+export interface ResolvedAttachment {
+	link: string
+	file: TFile
+}
+
+// resolves embed links to vault files, wrap obsidian resolver
+export function resolveAttachments(app: App, links: string[], sourcePath: string): ResolvedAttachment[] {
+	return links
+		.map((link) => ({ link, file: app.metadataCache.getFirstLinkpathDest(link, sourcePath) }))
+		.filter((r): r is ResolvedAttachment => r.file !== null);
+}
+
 export function buildConverter(
-	fm: FrontMatterCache,
+	cache: CachedMetadata,
 	data: string,
-	frontmatterEnd: Loc,
 	fallbackTitle: string,
 	settings: NotesPublisherSettings,
-	sections: SectionCache[] = [],
 ): { title: string, section: string, converter: NoteConverter } {
+	if (!cache.frontmatter || !cache.frontmatterPosition)
+		throw new Error('buildConverter requires a note with frontmatter');
+	const fm = cache.frontmatter;
+	const frontmatterEnd = cache.frontmatterPosition.end;
+
 	const title: string = fm[settings.fmTitle] ?? fallbackTitle;
-	const body = data.slice(frontmatterEnd.offset).replace(/^\n/, '');
 	const section = fm[settings.fmSection] ?? settings.defaultSection;
 
+	const { data: rewritten, attachments } = rewriteEmbedImages(data, cache.embeds ?? []);
+	const body = rewritten.slice(frontmatterEnd.offset).replace(/^\n/, '');
 	const bodyStartLine = frontmatterEnd.line + 1;
-	const bodySections: BodySection[] = sections.map((s) => ({
+	const bodySections: BodySection[] = (cache.sections ?? []).map((s) => ({
 		type: s.type,
 		position: {
 			start: { line: s.position.start.line - bodyStartLine },
@@ -42,7 +79,7 @@ export function buildConverter(
 		draft: settings.fmDraft,
 		title: settings.fmTitle,
 	});
-	converter.convert(fm, body, bodySections);
+	converter.convert(fm, body, bodySections, attachments);
 
 	return { title, section, converter };
 }
@@ -54,12 +91,15 @@ export class NoteConverter {
 	private convertedFm: [string, string][] | undefined;
 	private convertedContent: string | undefined;
 
+	attachments: string[] = [];
+
 	constructor(title: string, fmConfig: FrontMatterConfig) {
 		this.noteTitle = title;
 		this.fmConfig = fmConfig;
 	}
 
-	convert(fm: FrontMatterCache, content: string, sections: BodySection[] = []) {
+	convert(fm: FrontMatterCache, content: string, sections: BodySection[] = [], attachments: string[] = []) {
+		this.attachments = attachments;
 		this.processFrontMatter(fm);
 		this.processContent(content, sections);
 	}
@@ -81,18 +121,11 @@ export class NoteConverter {
 	}
 
 	private processContent(content: string, sections: BodySection[]) {
-		const processed = content
-			// embedded image
-			.replace(
-				/!\[\[([^|\]]+\.(?:jpe?g|png|gif|svg))\|([^\]]+)\]\]/g,
-				'![$2]($1)'
-			);
-
 		const sectionOfLine = (line: number) =>
 			sections.find((s) => s.position.start.line <= line && line <= s.position.end.line);
 
 		// translate visual line breaks to hard breaks for CommonMark
-		const lines = processed.split('\n');
+		const lines = content.split('\n');
 		this.convertedContent = lines
 			.map((line, i) => {
 				const next = lines[i + 1];
