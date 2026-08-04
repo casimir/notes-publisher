@@ -180,6 +180,76 @@ const cases: Case[] = [
 			content: "---\ntitle: Some title\ntags: [\"C, C++\"]\n---\n\nLorem ipsum",
 		},
 	},
+	{
+		name: "converts a titled callout to a hugo-notice shortcode",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "> [!warning] Watch out\n> Body line",
+			sections: [section("callout", 0, 1)],
+		},
+		expect: {
+			content:
+				"---\ntitle: Some title\n---\n\n" +
+				"{{< notice warning \"Watch out\" >}}\nBody line\n{{< /notice >}}",
+		},
+	},
+	{
+		name: "omits the title argument for a callout without one",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "> [!note]\n> Body line",
+			sections: [section("callout", 0, 1)],
+		},
+		expect: {
+			content:
+				"---\ntitle: Some title\n---\n\n" +
+				"{{< notice note >}}\nBody line\n{{< /notice >}}",
+		},
+	},
+	{
+		name: "maps an alias with a fold marker to its notice style, drops the fold marker",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "> [!danger]-\n> Body line",
+			sections: [section("callout", 0, 1)],
+		},
+		expect: {
+			content:
+				"---\ntitle: Some title\n---\n\n" +
+				"{{< notice warning >}}\nBody line\n{{< /notice >}}",
+		},
+	},
+	{
+		name: "falls back to note for an unknown callout type",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "> [!abstract] Summary\n> Body line",
+			sections: [section("callout", 0, 1)],
+		},
+		expect: {
+			content:
+				"---\ntitle: Some title\n---\n\n" +
+				"{{< notice note \"Summary\" >}}\nBody line\n{{< /notice >}}",
+		},
+	},
+	{
+		name: "keeps hard-break spaces on all but the last line of a multi-line callout body",
+		title: "Some title",
+		input: {
+			frontmatter: {},
+			content: "> [!tip] Careful\n> line one\n> line two",
+			sections: [section("callout", 0, 2)],
+		},
+		expect: {
+			content:
+				"---\ntitle: Some title\n---\n\n" +
+				"{{< notice tip \"Careful\" >}}\nline one  \nline two\n{{< /notice >}}",
+		},
+	},
 ];
 
 describe("NoteConverter", () => {

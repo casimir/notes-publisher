@@ -4,6 +4,23 @@ import path from "path";
 
 import { NotesPublisherSettings } from "./settings.js";
 
+
+// section types with visual line breaks in Obsidian
+const HARD_BREAK_SECTION_TYPES = new Set(['blockquote', 'callout', 'list', 'paragraph']);
+
+// hugo-notice style for each Obsidian callout type alias, falls back to 'note'
+const NOTICE_STYLES: Record<string, string> = {
+	warning: 'warning', danger: 'warning', error: 'warning', caution: 'warning',
+	attention: 'warning', failure: 'warning', fail: 'warning', missing: 'warning', bug: 'warning',
+	tip: 'tip', hint: 'tip', important: 'tip', success: 'tip', check: 'tip', done: 'tip',
+	info: 'info', todo: 'info', question: 'info', help: 'info', faq: 'info',
+	note: 'note',
+};
+
+const CALLOUT_HEAD = /^>\s*\[!(\w+)\][-+]?\s*(.*)$/;
+const IMAGE_EXTENSIONS = new Set(['.gif', '.jpeg', '.jpg', '.png', '.svg']);
+const WIKILINK = /^\[\[([^\]|#]+)[^\]]*\]\]$/;
+
 export interface FrontMatterConfig {
 	date: string,
 	draft: string,
@@ -11,13 +28,9 @@ export interface FrontMatterConfig {
 	tags: string,
 }
 
-// section types with visual line breaks in Obsidian
-const HARD_BREAK_SECTION_TYPES = new Set(['blockquote', 'callout', 'list', 'paragraph']);
-
 // subset of SectionCache, position are relative to the body (without frontmatter)
 export type BodySection = { type: string, position: { start: { line: number }, end: { line: number } } };
 
-const IMAGE_EXTENSIONS = new Set(['.gif', '.jpeg', '.jpg', '.png', '.svg']);
 
 function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string, attachments: string[] } {
 	const attachments: string[] = [];
@@ -37,8 +50,6 @@ function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string,
 
 	return { data: result, attachments };
 }
-
-const WIKILINK = /^\[\[([^\]|#]+)[^\]]*\]\]$/;
 
 function stripWikilink(value: string): string {
 	return (value.match(WIKILINK)?.[1] ?? value).trim();
@@ -142,19 +153,42 @@ export class NoteConverter {
 
 		// translate visual line breaks to hard breaks for CommonMark
 		const lines = content.split('\n');
-		this.convertedContent = lines
-			.map((line, i) => {
-				const next = lines[i + 1];
-				if (line === '' || next === undefined || next === '')
-					return line;
+		const withHardBreaks = lines.map((line, i) => {
+			const next = lines[i + 1];
+			if (line === '' || next === undefined || next === '')
+				return line;
 
-				const section = sectionOfLine(i);
-				if (!section || !HARD_BREAK_SECTION_TYPES.has(section.type) || section !== sectionOfLine(i + 1))
-					return line;
+			const section = sectionOfLine(i);
+			if (!section || !HARD_BREAK_SECTION_TYPES.has(section.type) || section !== sectionOfLine(i + 1))
+				return line;
 
-				return line + '  ';
-			})
-			.join('\n');
+			return line + '  ';
+		});
+
+		this.convertedContent = this.rewriteCallouts(withHardBreaks, sections).join('\n');
+	}
+
+	private rewriteCallouts(lines: string[], sections: BodySection[]): string[] {
+		const result: string[] = [];
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i] ?? '';
+			const section = sections.find((s) => s.type === 'callout' && s.position.start.line === i);
+			const head = section && line.match(CALLOUT_HEAD);
+			if (!section || !head) {
+				result.push(line);
+				continue;
+			}
+
+			const style = NOTICE_STYLES[head[1]!.toLowerCase()] ?? 'note';
+			const title = head[2]!.trim();
+			result.push(title ? `{{< notice ${style} ${JSON.stringify(title)} >}}` : `{{< notice ${style} >}}`);
+
+			for (i++; i <= section.position.end.line; i++)
+				result.push((lines[i] ?? '').replace(/^>\s?/, ''));
+			result.push('{{< /notice >}}');
+			i--;
+		}
+		return result;
 	}
 
 	toCommonMark(): string {
