@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import os from "os";
-import { App, arrayBufferToHex, CachedMetadata, TAbstractFile, TFile } from "obsidian";
+import { App, arrayBufferToHex, CachedMetadata, FrontMatterCache, TAbstractFile, TFile } from "obsidian";
 import path from "path";
 
 import slugify from "@sindresorhus/slugify";
@@ -109,9 +109,9 @@ export class NotesSyncer {
 		if (!filter.matches(cache.frontmatter)) return;
 		const fm = cache.frontmatter!;
 
-		const title: string = fm[this.settings.fmTitle] ?? file.basename;
+		const title = (fm[this.settings.fmTitle] as string | undefined) ?? file.basename;
 		if (fm[this.settings.fmSlug] === undefined) {
-			await this.app.fileManager.processFrontMatter(file, (fm) => {
+			await this.app.fileManager.processFrontMatter(file, (fm: FrontMatterCache) => {
 				fm[this.settings.fmSlug] = '/' + slugify(title);
 			});
 			// this event is stalled now, bail out and lean on the next event
@@ -126,7 +126,7 @@ export class NotesSyncer {
 
 		// TODO add validity checks for slug and section values
 		const { section, converter } = buildConverter(cache, data, file.basename, this.settings);
-		const slug = fm[this.settings.fmSlug];
+		const slug = fm[this.settings.fmSlug] as string;
 		const bundlePath = path.join(this.resolveDiskDestination(), section, slug);
 
 		await converter.writeInto(bundlePath);

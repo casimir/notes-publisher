@@ -24,7 +24,7 @@ export async function collectFiles(app: App, settings: NotesPublisherSettings): 
 		const data = await app.vault.cachedRead(it);
 
 		const { title, section, converter } = buildConverter(cache, data, it.basename, settings);
-		const slug = fm[settings.fmSlug] ?? slugify(title);
+		const slug = (fm[settings.fmSlug] as string | undefined) ?? slugify(title);
 		const bundleDir = `${section}/${slug}`;
 
 		const attachmentFiles = await Promise.all(resolveAttachments(app, converter.attachments, it.path).map(async ({ link, file }) => ({

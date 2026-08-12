@@ -263,7 +263,7 @@ describe("NoteConverter", () => {
 
 	it.each(cases)("$name", ({ title, input, expect: expected }) => {
 		const converter = new NoteConverter(title, fmConfig);
-		converter.convert(input.frontmatter as never, input.content, input.sections ?? []);
+		converter.convert(input.frontmatter, input.content, input.sections ?? []);
 
 		expect(converter.toCommonMark()).toBe(expected.content);
 	});

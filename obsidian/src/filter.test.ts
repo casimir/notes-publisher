@@ -164,7 +164,7 @@ describe("PredicateParser", () => {
 interface CompareCase {
 	name: string;
 	term: FilterTerm;
-	value: any;
+	value: unknown;
 	expect: boolean | { error: RegExp };
 }
 

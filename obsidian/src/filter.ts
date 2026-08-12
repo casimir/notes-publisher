@@ -44,11 +44,11 @@ function parseNextString(text: string): ParsedString {
 
 export interface FilterTerm {
 	key: string
-	value: any
+	value: string
 	negated: boolean
 }
 
-function dynamicEquals(stringed: string, value: any): boolean {
+function dynamicEquals(stringed: string, value: unknown): boolean {
 	if (Array.isArray(value))
 		return value.some((it) => dynamicEquals(stringed, it));
 
@@ -60,11 +60,11 @@ function dynamicEquals(stringed: string, value: any): boolean {
 		case 'string':
 			return stringed === value;
 		default:
-			throw new Error(`unknown value type: ${value}`);
+			throw new Error(`unknown value type: ${String(value)}`);
 	}
 }
 
-export function compareTerm(term: FilterTerm, value: any) {
+export function compareTerm(term: FilterTerm, value: unknown) {
 	if (value === undefined)
 		return false;
 

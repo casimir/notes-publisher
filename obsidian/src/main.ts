@@ -57,7 +57,7 @@ export default class NotesPublisher extends Plugin {
 
 		this.diskSyncStatusItem = this.addStatusBarItem();
 		this.diskSyncStatusItem.onClickEvent((_evt: MouseEvent) => {
-			this.switchDiskSync(Switch.toggle);
+			void this.switchDiskSync(Switch.toggle);
 		})
 		this.updateStatusBar();
 	}
@@ -99,7 +99,7 @@ export default class NotesPublisher extends Plugin {
 			await Promise.all(this.app.vault.getMarkdownFiles().map(async (file) => {
 				const cache = this.app.metadataCache.getFileCache(file)!;
 				const content = await this.app.vault.cachedRead(file);
-				this.syncer.onNoteUpdate(file, content, cache);
+				await this.syncer.onNoteUpdate(file, content, cache);
 			}));
 		}
 
@@ -111,18 +111,19 @@ export default class NotesPublisher extends Plugin {
 	}
 }
 
-export function EN<TFunc extends (...args: any[]) => any>(func: TFunc): (...args: Parameters<TFunc>) => ReturnType<TFunc> {
+export function EN<TArgs extends unknown[], TReturn>(func: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn | undefined {
 	const notifyError = (e: unknown) => {
 		const message = e instanceof Error ? e.message : 'unknown error';
 		new Notice('Publisher: ' + message, 400);
 	};
-	return (...args: Parameters<TFunc>) => {
+	return (...args: TArgs) => {
 		try {
 			const result = func(...args);
 			if (result instanceof Promise) result.catch(notifyError);
 			return result;
 		} catch (e) {
 			notifyError(e);
+			return undefined;
 		}
 	};
 }

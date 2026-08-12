@@ -84,8 +84,8 @@ export function buildConverter(
 	const fm = cache.frontmatter;
 	const frontmatterEnd = cache.frontmatterPosition.end;
 
-	const title: string = fm[settings.fmTitle] ?? fallbackTitle;
-	const section = fm[settings.fmSection] ?? settings.defaultSection;
+	const title = (fm[settings.fmTitle] as string | undefined) ?? fallbackTitle;
+	const section = (fm[settings.fmSection] as string | undefined) ?? settings.defaultSection;
 
 	const { data: rewritten, attachments } = rewriteEmbedImages(data, cache.embeds ?? []);
 	const body = rewritten.slice(frontmatterEnd.offset).replace(/^\n/, '');
@@ -135,18 +135,18 @@ export class NoteConverter {
 		];
 
 		if (this.fmConfig.date in fm) {
-			const date: string = fm[this.fmConfig.date];
+			const date = fm[this.fmConfig.date] as string;
 			this.convertedFm.push(['date', date]);
 		}
 
 		if (this.fmConfig.draft in fm) {
-			const value: boolean = fm[this.fmConfig.draft];
+			const value = fm[this.fmConfig.draft] as boolean;
 			this.convertedFm.push(['draft', value.toString()]);
 		}
 
 		if (this.fmConfig.tags in fm) {
-			const raw = fm[this.fmConfig.tags];
-			const values: string[] = Array.isArray(raw) ? raw : [raw];
+			const raw = fm[this.fmConfig.tags] as unknown;
+			const values: string[] = Array.isArray(raw) ? raw as string[] : [raw as string];
 			const names = values.map(stripWikilink).filter((n) => n !== '');
 			if (names.length > 0)
 				this.convertedFm.push(['tags', `[${names.map((n) => JSON.stringify(n)).join(', ')}]`]);
