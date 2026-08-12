@@ -1,5 +1,4 @@
 import { App, requestUrl } from "obsidian"
-import path from "path"
 
 import slugify from "@sindresorhus/slugify"
 
@@ -26,15 +25,15 @@ export async function collectFiles(app: App, settings: NotesPublisherSettings): 
 
 		const { title, section, converter } = buildConverter(cache, data, it.basename, settings);
 		const slug = fm[settings.fmSlug] ?? slugify(title);
-		const bundleDir = path.join(section, slug);
+		const bundleDir = `${section}/${slug}`;
 
 		const attachmentFiles = await Promise.all(resolveAttachments(app, converter.attachments, it.path).map(async ({ link, file }) => ({
-			name: path.join(bundleDir, link),
+			name: `${bundleDir}/${link}`,
 			content: new Blob([await app.vault.readBinary(file)]),
 		})));
 
 		return [
-			{ name: path.join(bundleDir, 'index.md'), content: new Blob([converter.toCommonMark()]) },
+			{ name: `${bundleDir}/index.md`, content: new Blob([converter.toCommonMark()]) },
 			...attachmentFiles,
 		];
 	}));

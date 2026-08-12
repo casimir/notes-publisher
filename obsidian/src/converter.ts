@@ -2,6 +2,12 @@ import { promises as fs } from "fs";
 import { App, CachedMetadata, EmbedCache, FrontMatterCache, TFile } from "obsidian";
 import path from "path";
 
+function extname(filePath: string): string {
+	const base = filePath.slice(filePath.lastIndexOf('/') + 1);
+	const dot = base.lastIndexOf('.');
+	return dot > 0 ? base.slice(dot) : '';
+}
+
 import { NotesPublisherSettings } from "./settings.js";
 
 
@@ -38,7 +44,7 @@ function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string,
 
 	let result = data;
 	for (const embed of byOffsetDesc) {
-		const ext = path.extname(embed.link).toLowerCase();
+		const ext = extname(embed.link).toLowerCase();
 		if (!IMAGE_EXTENSIONS.has(ext)) continue;
 
 		if (!attachments.includes(embed.link)) attachments.unshift(embed.link);
