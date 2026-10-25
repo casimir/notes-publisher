@@ -50,7 +50,7 @@ function rewriteEmbedImages(data: string, embeds: EmbedCache[]): { data: string,
 		if (!attachments.includes(embed.link)) attachments.unshift(embed.link);
 
 		const alt = embed.displayText && embed.displayText !== embed.link ? embed.displayText : '';
-		const replacement = `![${alt}](${embed.link})`;
+		const replacement = `![${alt}](<${embed.link}>)`;
 		result = result.slice(0, embed.position.start.offset) + replacement + result.slice(embed.position.end.offset);
 	}
 

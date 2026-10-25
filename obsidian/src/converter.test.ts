@@ -316,7 +316,7 @@ describe("buildConverter attachments", () => {
 
 		expect(converter.toCommonMark()).toBe(
 			"---\ntitle: fallback\n---\n\n" +
-			"Lorem ipsum.\n\n![Sed do eiusmod](dolor.png)\n\nSee also [[Ut enim ad minim]] for the flip side."
+			"Lorem ipsum.\n\n![Sed do eiusmod](<dolor.png>)\n\nSee also [[Ut enim ad minim]] for the flip side."
 		);
 		expect(converter.attachments).toEqual(["dolor.png"]);
 	});
@@ -328,7 +328,18 @@ describe("buildConverter attachments", () => {
 
 		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
 
-		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![](dolor.png)");
+		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![](<dolor.png>)");
+	});
+
+	it("wraps a path with spaces in <> and ships the raw path", () => {
+		const body = "![[my pic.png]]";
+		const data = FRONTMATTER + body;
+		const embeds = embedsIn(data, [{ raw: "![[my pic.png]]", link: "my pic.png" }]);
+
+		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
+
+		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![](<my pic.png>)");
+		expect(converter.attachments).toEqual(["my pic.png"]);
 	});
 
 	it("keeps a nested-path embed's link as the bundle-relative path", () => {
@@ -340,7 +351,7 @@ describe("buildConverter attachments", () => {
 
 		const { converter } = buildConverter(cacheWith(embeds), data, "fallback", settings);
 
-		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![Nested](attachments/nested/img.jpg)");
+		expect(converter.toCommonMark()).toBe("---\ntitle: fallback\n---\n\n![Nested](<attachments/nested/img.jpg>)");
 		expect(converter.attachments).toEqual(["attachments/nested/img.jpg"]);
 	});
 
